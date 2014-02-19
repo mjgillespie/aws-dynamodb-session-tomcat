@@ -22,6 +22,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.juli.logging.Log;
+
 import org.apache.catalina.Container;
 import org.apache.catalina.Session;
 import org.apache.catalina.session.StandardSession;
@@ -108,6 +110,8 @@ public class DynamoDBSessionStore extends StoreBase {
         }
 
 
+		DynamoDBSessionManager.warn("Loading session..." + id);
+        
         Session session = getManager().createSession(id);
         session.setCreationTime(Long.parseLong(item.get(SessionTableAttributes.CREATED_AT_ATTRIBUTE).getN()));
 
@@ -131,6 +135,8 @@ public class DynamoDBSessionStore extends StoreBase {
 
             for (String s : sessionAttributeMap.keySet()) {
                 ((StandardSession)session).setAttribute(s, sessionAttributeMap.get(s));
+                
+                DynamoDBSessionManager.debug("Load name: " + s + " value:" + sessionAttributeMap.get(s));
             }
         } else {
             throw new RuntimeException("Error: Unable to unmarshall session attributes from DynamoDB store");
@@ -154,4 +160,5 @@ public class DynamoDBSessionStore extends StoreBase {
         DynamoUtils.deleteSession(dynamo, sessionTableName, id);
         keys.remove(id);
     }
+    
 }

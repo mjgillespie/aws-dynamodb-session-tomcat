@@ -58,7 +58,7 @@ public class DynamoUtils {
         map.put(SessionTableAttributes.SESSION_ID_KEY, new AttributeValue(sessionId));
         GetItemRequest request = new GetItemRequest(tableName, map);
         addClientMarker(request);
-
+		
         try {
             GetItemResult result = dynamo.getItem(request);
             return result.getItem();
@@ -87,11 +87,18 @@ public class DynamoUtils {
         Map<String, Object> sessionAttributes = new HashMap<String, Object>();
 
         HttpSession httpSession = session.getSession();
+
+        DynamoDBSessionManager.debug("Store Session: " + httpSession.getId());
+
+
         Enumeration<String> attributeNames = httpSession.getAttributeNames();
         while (attributeNames.hasMoreElements()) {
             String attributeName = attributeNames.nextElement();
             Object attributeValue = httpSession.getAttribute(attributeName);
             sessionAttributes.put(attributeName, attributeValue);
+            
+            DynamoDBSessionManager.debug("Store name: " + attributeName + " value:" + attributeValue);
+
         }
 
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();

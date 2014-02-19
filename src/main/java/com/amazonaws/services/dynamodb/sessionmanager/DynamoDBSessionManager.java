@@ -16,9 +16,13 @@ package com.amazonaws.services.dynamodb.sessionmanager;
 
 import java.io.File;
 
+ import java.io.IOException;
+ 
 import org.apache.catalina.LifecycleException;
 import org.apache.catalina.session.PersistentManagerBase;
 import org.apache.juli.logging.Log;
+
+import org.apache.catalina.Session;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.auth.AWSCredentialsProvider;
@@ -67,7 +71,9 @@ public class DynamoDBSessionManager extends PersistentManagerBase {
         setMaxInactiveInterval(60 * 60 * 2); // 2 hours
 
         // MaxIdleBackup controls when sessions are persisted to the store
-        setMaxIdleBackup(30); // 30 seconds
+        super.setMaxIdleBackup(-1); // 30 seconds
+        
+        super.setMaxIdleSwap(30);
     }
 
     @Override
@@ -80,6 +86,35 @@ public class DynamoDBSessionManager extends PersistentManagerBase {
         return name;
     }
 
+   /**
+     * Implements the Manager interface, direct call to processExpires and processPersistenceChecks
+     */
+    @Override
+    public void processExpires() {
+        
+        long timeNow = System.currentTimeMillis();
+        Session sessions[] = findSessions();
+        int expireHere = 0 ;
+        if(logger.isDebugEnabled())
+             logger.debug("Start expire sessions " + getName() + " at " + timeNow + " sessioncount " + sessions.length);
+        for (int i = 0; i < sessions.length; i++) {
+            if (!sessions[i].isValid()) {
+                expiredSessions.incrementAndGet();
+                expireHere++;
+            }
+        }
+        processPersistenceChecks();
+        //if ((getStore() != null) && (getStore() instanceof StoreBase)) {
+        //   ((StoreBase) getStore()).processExpires();
+        //}
+        
+        long timeEnd = System.currentTimeMillis();
+        if(logger.isDebugEnabled())
+             logger.debug("End expire sessions " + getName() + " processingTime " + (timeEnd - timeNow) + " expired sessions: " + expireHere);
+        processingTime += (timeEnd - timeNow);
+         
+    }
+	
     //
     // Context.xml Configuration Members
     //
@@ -120,6 +155,13 @@ public class DynamoDBSessionManager extends PersistentManagerBase {
         this.createIfNotExist = createIfNotExist;
     }
 
+    public void setMaxIdleBackup(int maxIdleBackup) {
+        super.setMaxIdleBackup(maxIdleBackup);
+    }
+
+    public void setMaxIdleSwap(int maxIdleSwap) {
+        super.setMaxIdleSwap(maxIdleSwap);
+    }
 
     //
     // Private Interface
@@ -132,6 +174,10 @@ public class DynamoDBSessionManager extends PersistentManagerBase {
         // Grab the container's logger
         logger = getContainer().getLogger();
 
+		error("Initializing DynamoDb Session Manager");
+		warn("Initializing DynamoDb Session Manager");
+		debug("Initializing DynamoDb Session Manager");
+		
         AWSCredentialsProvider credentialsProvider = initCredentials();
         AmazonDynamoDBClient dynamo = new AmazonDynamoDBClient(credentialsProvider);
         if (this.regionId != null) dynamo.setRegion(RegionUtils.getRegion(this.regionId));
@@ -159,6 +205,8 @@ public class DynamoDBSessionManager extends PersistentManagerBase {
             throw new AmazonClientException("Session table '" + tableName + "' does not exist, "
                     + "and automatic table creation has been disabled in context.xml");
         }
+
+	    warn("Initializing DynamoDb Session Manager Tablename" + this.tableName);
 
         if (!tableExists) DynamoUtils.createSessionTable(dynamo, this.tableName,
                 this.readCapacityUnits, this.writeCapacityUnits);
